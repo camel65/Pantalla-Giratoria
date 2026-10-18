@@ -5,106 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rotación Impredecible</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            background-color: #000;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        /* Botón de Inicio */
-        #btn-inicio {
-            padding: 18px 45px;
-            font-size: 1.6rem;
-            color: #00ffcc;
-            background: transparent;
-            border: 2px solid #00ffcc;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
-            z-index: 10;
-        }
-
-        #btn-inicio:hover {
-            background-color: #00ffcc;
-            color: #000;
-            box-shadow: 0 0 35px rgba(0, 255, 204, 0.8);
-            transform: scale(1.08);
-        }
-
-        /* Controles flotantes */
-        .controles {
-            display: none;
-            position: fixed;
-            top: 25px;
-            right: 25px;
-            gap: 12px;
-            z-index: 20;
-        }
-
-        .btn-control {
-            padding: 10px 22px;
-            font-size: 0.95rem;
-            color: #fff;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 30px;
-            backdrop-filter: blur(5px);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-control:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.05);
-        }
-
-        #btn-salir:hover {
-            background: rgba(255, 0, 85, 0.8);
-            border-color: #ff0055;
-            box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
-        }
-
-        /* Contenedor del lienzo */
-        #canvas-container {
-            display: none;
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-
-        canvas {
-            display: block;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #000; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #btn-inicio { padding: 18px 45px; font-size: 1.6rem; color: #00ffcc; background: transparent; border: 2px solid #00ffcc; border-radius: 50px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 25px rgba(0, 255, 204, 0.4); z-index: 10; }
+        #btn-inicio:hover { background-color: #00ffcc; color: #000; box-shadow: 0 0 35px rgba(0, 255, 204, 0.8); transform: scale(1.08); }
+        .controles { display: none; position: fixed; top: 25px; right: 25px; gap: 12px; z-index: 20; }
+        .btn-control { padding: 10px 22px; font-size: 0.95rem; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 30px; backdrop-filter: blur(5px); cursor: pointer; transition: all 0.3s ease; }
+        .btn-control:hover { background: rgba(255, 255, 255, 0.25); transform: scale(1.05); }
+        #btn-salir:hover { background: rgba(255, 0, 85, 0.8); border-color: #ff0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.6); }
+        #canvas-container { display: none; position: absolute; width: 100%; height: 100%; cursor: pointer; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-
-    <!-- Botón de Inicio -->
+    <audio id="miMusica" src="musica3.mp3" preload="auto" loop></audio>
     <button id="btn-inicio">Inicio</button>
-
-    <!-- Controles flotantes -->
     <div class="controles" id="panel-controles">
         <button class="btn-control" id="btn-audio">🔊 Sonido: ON</button>
         <button class="btn-control" id="btn-salir">Salir</button>
     </div>
-
-    <!-- Contenedor del lienzo -->
     <div id="canvas-container">
         <canvas id="rotacionCanvas"></canvas>
     </div>
-
     <script>
         const btnInicio = document.getElementById('btn-inicio');
         const btnSalir = document.getElementById('btn-salir');
@@ -113,121 +35,37 @@
         const canvasContainer = document.getElementById('canvas-container');
         const canvas = document.getElementById('rotacionCanvas');
         const ctx = canvas.getContext('2d');
+        const audioElement = document.getElementById('miMusica');
 
         let animacionId = null;
         let angulo = 0;
-        let velocidadGiro = 0.02; // Velocidad de giro
-        let direccionGiro = 1;     // 1: Horario, -1: Antihorario
+        let velocidadGiro = 0.02;
+        let direccionGiro = 1;
         let colorMatiz = 180;
         let activo = false;
         let ondasClic = [];
 
-        // Variables de Audio (Volumen Máximo)
-        let audioCtx = null;
-        let audioActivo = true;
-        let masterGain = null;
-        let compresor = null;
-        let filtro = null;
-
-        function ajustarCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-
+        function ajustarCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.addEventListener('resize', ajustarCanvas);
 
-        // --- SISTEMA DE AUDIO REACTIVO ---
-        function emitirSonidoCambio(frecuenciaBase) {
-            if (!audioActivo || !audioCtx || audioCtx.state !== 'running') return;
-
-            const tiempoActual = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(frecuenciaBase, tiempoActual);
-            osc.frequency.exponentialRampToValueAtTime(frecuenciaBase * 2, tiempoActual + 0.2);
-
-            gain.gain.setValueAtTime(1.0, tiempoActual);
-            gain.gain.exponentialRampToValueAtTime(0.001, tiempoActual + 0.25);
-
-            osc.connect(gain);
-            gain.connect(filtro);
-            osc.start(tiempoActual);
-            osc.stop(tiempoActual + 0.26);
-        }
-
-        function iniciarAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            } else if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-
-            masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(audioActivo ? 1.0 : 0, audioCtx.currentTime);
-
-            compresor = audioCtx.createDynamicsCompressor();
-            compresor.threshold.setValueAtTime(-15, audioCtx.currentTime);
-            compresor.ratio.setValueAtTime(12, audioCtx.currentTime);
-
-            filtro = audioCtx.createBiquadFilter();
-            filtro.type = 'lowpass';
-            filtro.frequency.setValueAtTime(2500, audioCtx.currentTime);
-
-            filtro.connect(compresor);
-            compresor.connect(masterGain);
-            masterGain.connect(audioCtx.destination);
-        }
-
-        function detenerAudio() {
-            if (masterGain && audioCtx) {
-                masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
-            }
-        }
-
         btnAudio.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evita que cuente como clic de giro
-            audioActivo = !audioActivo;
-            btnAudio.textContent = audioActivo ? "🔊 Sonido: ON" : "🔇 Sonido: OFF";
-            if (masterGain && audioCtx) {
-                masterGain.gain.setValueAtTime(audioActivo ? 1.0 : 0, audioCtx.currentTime);
-            }
+            e.stopPropagation();
+            audioElement.muted = !audioElement.muted;
+            btnAudio.textContent = audioElement.muted ? "🔇 Sonido: OFF" : "🔊 Sonido: ON";
         });
 
-        // --- INTERACCIÓN DE CLIC PARA CAMBIAR SENTIDO Y VELOCIDAD DE GIRO ---
         canvasContainer.addEventListener('click', (e) => {
             if (!activo) return;
-
-            // Cambiar sentido aleatoriamente (-1 o 1)
             direccionGiro = Math.random() < 0.5 ? -1 : 1;
-
-            // Cambiar velocidad aleatoriamente entre 0.01 y 0.08
             velocidadGiro = (Math.random() * 0.07 + 0.01) * direccionGiro;
-
-            // Cambiar tono del color neón
             colorMatiz = (colorMatiz + Math.random() * 90 + 30) % 360;
-
-            // Registrar onda expansiva en la posición del clic
-            ondasClic.push({
-                x: e.clientX,
-                y: e.clientY,
-                radio: 10,
-                alpha: 1.0,
-                matiz: colorMatiz
-            });
-
-            // Emitir sonido con diferente tono según la velocidad
-            let freqSonido = Math.abs(velocidadGiro) * 3000 + 150;
-            emitirSonidoCambio(freqSonido);
+            ondasClic.push({ x: e.clientX, y: e.clientY, radio: 10, alpha: 1.0, matiz: colorMatiz });
         });
 
-        // --- CONTROLES DE PÁGINA ---
         btnInicio.addEventListener('click', () => {
             btnInicio.style.display = 'none';
             panelControles.style.display = 'flex';
             canvasContainer.style.display = 'block';
-            
             ajustarCanvas();
             angulo = 0;
             velocidadGiro = 0.03;
@@ -235,35 +73,36 @@
             activo = true;
             ondasClic = [];
 
-            iniciarAudio();
+            audioElement.currentTime = 0;
+            audioElement.muted = false;
+            btnAudio.textContent = "🔊 Sonido: ON";
+            audioElement.play().catch(err => console.log(err));
+
             iniciarAnimacion();
         });
 
         btnSalir.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evita activar clic de giro
+            e.stopPropagation();
             activo = false;
             if (animacionId) cancelAnimationFrame(animacionId);
-            detenerAudio();
+
+            audioElement.pause();
+            audioElement.currentTime = 0;
 
             canvasContainer.style.display = 'none';
             panelControles.style.display = 'none';
             btnInicio.style.display = 'block';
-            
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         });
 
-        // --- BUCLE DE ANIMACIÓN DE ROTACIÓN ---
         function iniciarAnimacion() {
             if (!activo) return;
-
-            // Limpiar fondo con estela suave
             ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const centroX = canvas.width / 2;
             const centroY = canvas.height / 2;
 
-            // Dibujar patrón central que rota
             ctx.save();
             ctx.translate(centroX, centroY);
             ctx.rotate(angulo);
@@ -283,7 +122,6 @@
                 ctx.stroke();
             }
 
-            // Anillos geométricos giratorios
             for (let r = 50; r < maxRadio; r += 70) {
                 ctx.beginPath();
                 ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -294,17 +132,11 @@
             }
             ctx.restore();
 
-            // Dibujar y actualizar las ondas de los clics
             for (let i = ondasClic.length - 1; i >= 0; i--) {
                 let o = ondasClic[i];
                 o.radio += 8;
                 o.alpha -= 0.02;
-
-                if (o.alpha <= 0) {
-                    ondasClic.splice(i, 1);
-                    continue;
-                }
-
+                if (o.alpha <= 0) { ondasClic.splice(i, 1); continue; }
                 ctx.beginPath();
                 ctx.arc(o.x, o.y, o.radio, 0, Math.PI * 2);
                 ctx.strokeStyle = `hsla(${o.matiz}, 100%, 60%, ${o.alpha})`;
@@ -312,9 +144,7 @@
                 ctx.stroke();
             }
 
-            // Aplicar la velocidad de rotación actual
             angulo += velocidadGiro;
-
             animacionId = requestAnimationFrame(iniciarAnimacion);
         }
     </script>
